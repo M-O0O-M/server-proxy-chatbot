@@ -4,25 +4,40 @@ module.exports = async (req, res) => {
       return res.status(405).json({ error: "Method Not Allowed" });
     }
 
-    const OPENAI_KEY = process.env.OPENAI_KEY;
-    if (!OPENAI_KEY) {
-      return res.status(500).json({ error: "Missing OPENAI_KEY in Vercel" });
+    // Read body manually (Vercel v2 does NOT auto-parse JSON)
+    let rawBody = "";
+    for await (const chunk of req) {
+      rawBody += chunk;
     }
 
+    let body = {};
+    try {
+      body = JSON.parse(rawBody || "{}");
+    } catch (e) {
+      return res.status(400).json({ error: "Invalid JSON body" });
+    }
+
+    // Check API key
+    const OPENAI_KEY = process.env.OPENAI_KEY;
+    if (!OPENAI_KEY) {
+      return res.status(500).json({ error: "Missing OPENAI_KEY" });
+    }
+
+    // Call OpenAI API
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${OPENAI_KEY}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify(req.body)
+      body: JSON.stringify(body)
     });
 
     const data = await response.json();
-    res.status(response.status).json(data);
+    return res.status(response.status).json(data);
 
-  } catch (error) {
-    console.error("Proxy error:", error);
-    res.status(500).json({ error: "Proxy server error" });
+  } catch (err) {
+    console.error("Proxy failure:", err);
+    return res.status(500).json({ error: "Internal Proxy Error" });
   }
 };
