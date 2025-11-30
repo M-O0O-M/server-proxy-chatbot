@@ -23,15 +23,21 @@ module.exports = async (req, res) => {
       return res.status(500).json({ error: "Missing OPENAI_KEY" });
     }
 
-    // Call OpenAI API
+    // Call OpenAI API with timeout
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 55000); // 55s timeout
+    
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${OPENAI_KEY}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      signal: controller.signal
     });
+    
+    clearTimeout(timeout);
 
     const data = await response.json();
     return res.status(response.status).json(data);
